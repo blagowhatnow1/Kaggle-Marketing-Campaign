@@ -1,0 +1,130 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>🧭 Itinerary Optimization Plan</title>
+    <style>
+        body {
+            font-family: "Segoe UI", sans-serif;
+            line-height: 1.6;
+            padding: 20px;
+            background: #fdfdfd;
+            color: #333;
+        }
+        h1, h2 {
+            color: #004080;
+        }
+        code {
+            background-color: #f4f4f4;
+            padding: 2px 6px;
+            font-size: 90%;
+        }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 12px;
+        }
+        th, td {
+            border: 1px solid #ccc;
+            padding: 8px;
+        }
+        th {
+            background: #f0f0f0;
+        }
+    </style>
+</head>
+<body>
+
+<h1>🧭 Itinerary Optimization Plan</h1>
+
+<p>This document outlines a <strong>Linear Programming</strong> approach for planning a travel itinerary. The goal is to select <strong>5 bookings</strong> from a set of <strong>n = 100</strong> synthetic travel options in such a way that the overall trip cost is minimized while satisfying a series of practical constraints like budget, quality of service, and environmental impact.</p>
+
+<h2>📌 Problem Definition</h2>
+<ul>
+  <li><strong>Input:</strong> 100 potential travel bookings</li>
+  <li><strong>Output:</strong> Choose 5 optimal bookings</li>
+  <li><strong>Goal:</strong> Minimize total trip cost under constraints</li>
+</ul>
+
+<h2>🔢 Decision Variables</h2>
+<p>For each booking <em>i</em>, define a binary decision variable:</p>
+<pre><code>x<sub>i</sub> ∈ {0, 1}</code></pre>
+<ul>
+  <li><strong>x<sub>i</sub> = 1</strong> → booking i is selected</li>
+  <li><strong>x<sub>i</sub> = 0</strong> → booking i is not selected</li>
+</ul>
+
+<h2>🎯 Objective Function</h2>
+<p>Each booking has a total inclusive cost:</p>
+<pre><code>TrueTotalCost<sub>i</sub> = Flight<sub>i</sub> + Transport<sub>i</sub> + Insurance<sub>i</sub> + Guide<sub>i</sub> + Hotel<sub>i</sub> + HotelTax<sub>i</sub> + HotelServiceFee<sub>i</sub></code></pre>
+
+<p><strong>Minimize:</strong></p>
+<pre><code>Z = ∑ (x<sub>i</sub> × TrueTotalCost<sub>i</sub>) for i = 1 to 100</code></pre>
+
+<h2>📐 Constraints</h2>
+
+<h3>1. Selection Constraint</h3>
+<pre><code>∑ x<sub>i</sub> = 5</code></pre>
+<p>Select exactly 5 bookings.</p>
+
+<h3>2. Budget Constraint</h3>
+<pre><code>∑ (x<sub>i</sub> × TrueTotalCost<sub>i</sub>) ≤ ₹90,000</code></pre>
+<p>Ensure the trip stays within a reasonable budget.</p>
+
+<h3>3. Minimum Guide Quality</h3>
+<pre><code>∑ (x<sub>i</sub> × GuideRating<sub>i</sub>) ≥ 20.0</code></pre>
+<p>Enforces a minimum average guide rating of 4.0 across selected bookings.</p>
+
+<h3>4. Hotel Quality Constraint</h3>
+<pre><code>x<sub>i</sub> = 0 if HotelRating<sub>i</sub> &lt; 3.5</code></pre>
+<p>Bookings with poor hotel ratings are excluded up front.</p>
+
+<h3>5. Transport Type Filter</h3>
+<pre><code>x<sub>i</sub> = 0 if TransportType<sub>i</sub> = "Auto"</code></pre>
+<p>Bookings using auto rickshaws are not considered for long trips.</p>
+
+<h3>6. Environmental Constraint</h3>
+<pre><code>∑ (x<sub>i</sub> × CarbonScore<sub>i</sub>) ≤ 800.0</code></pre>
+<p>Encourages selection of eco-friendly travel options.</p>
+
+<h2>📦 Implementation Notes</h2>
+<ul>
+  <li>Model is implemented in Python using <code>scipy.optimize.linprog</code></li>
+  <li>Constraints are handled as equality/inequality matrices</li>
+  <li>Solver fallback uses methods like <code>'simplex'</code> or <code>'interior-point'</code></li>
+</ul>
+
+<h2>🧮 Dataset Column Dictionary</h2>
+
+<table>
+  <thead>
+    <tr>
+      <th>Column</th>
+      <th>Description</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr><td>BookingID</td><td>Unique identifier for the booking</td></tr>
+    <tr><td>City</td><td>Destination city</td></tr>
+    <tr><td>FlightCost</td><td>Cost of flight</td></tr>
+    <tr><td>TransportCost</td><td>Local transport cost</td></tr>
+    <tr><td>InsuranceCost</td><td>Insurance for the trip</td></tr>
+    <tr><td>GuideCost</td><td>Tour guide expenses</td></tr>
+    <tr><td>TransportType</td><td>Type of local transport (e.g., Train, Cab)</td></tr>
+    <tr><td>GuideRating</td><td>Rating of the guide (3.0–5.0)</td></tr>
+    <tr><td>CarbonScore</td><td>Estimated environmental impact</td></tr>
+    <tr><td>HotelCost</td><td>Base cost of accommodation</td></tr>
+    <tr><td>HotelTax</td><td>Hotel taxes (5%–10%)</td></tr>
+    <tr><td>HotelServiceFee</td><td>Hotel service charge</td></tr>
+    <tr><td>HotelRating</td><td>Hotel rating (3.5–5.0)</td></tr>
+    <tr><td>TotalCost</td><td>Subtotal without hotel costs</td></tr>
+    <tr><td>TrueTotalCost</td><td>Total cost including hotel-related fees</td></tr>
+  </tbody>
+</table>
+
+<h2>© 2025 Travel Itinerary Optimization</h2>
+<p>Crafted with ❤️ using Linear Programming, synthetic data, and a real-world use case mindset.</p>
+
+</body>
+</html>
+
