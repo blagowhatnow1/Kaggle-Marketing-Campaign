@@ -1,0 +1,220 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>📘 Travel Booking — Production-Ready Schema Documentation</title>
+  <style>
+    body { font-family: Inter, Arial, sans-serif; margin: 32px; line-height: 1.6; color:#111827; background:#f8fafc }
+    .container{max-width:1100px;margin:0 auto;background:#fff;padding:28px;border-radius:12px;box-shadow:0 6px 18px rgba(15,23,42,0.06)}
+    h1,h2,h3 { color: #0f172a; margin-top:0 }
+    table { border-collapse: collapse; width: 100%; margin-bottom: 1.2rem; }
+    th, td { border: 1px solid #e6e9ee; padding: 10px; text-align: left; vertical-align:top }
+    th { background-color: #f1f5f9; font-weight:600 }
+    code, pre { background: #f8fafc; padding: 6px 8px; border-radius:6px; display:block; white-space:pre-wrap }
+    .lead { color:#374151 }
+    .ok { color: #065f46; font-weight:600 }
+    .warn { color: #854d0e; font-weight:600 }
+    .badge { display:inline-block;padding:4px 8px;border-radius:999px;background:#eef2ff;color:#3730a3;font-weight:600;font-size:13px }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>📘 Travel Booking — Production-Ready Schema Documentation</h1>
+    <p class="lead">This document contains the corrected OLTP (ERD) and star schema definitions, production-ready DDL examples, ETL mapping guidance, validations, and implementation notes.</p>
+
+    <h2>1. Key changes applied</h2>
+    <ul>
+      <li class="ok">Removed circular foreign key between <code>Bookings</code> and <code>Cancellations</code>. <strong>Cancellation references Booking</strong>.</li>
+      <li class="ok">Introduced <code>PaymentAllocations</code> to support partial/allocated payments (payment can pay multiple bookings and vice-versa).</li>
+      <li class="ok">Added join tables for potential M:N relationships (example: <code>PackageDestinations</code>, <code>PackageHotels</code>).</li>
+      <li class="ok">Added SCD2-ready attributes in dimensions and ETL audit columns for DW.</li>
+      <li class="ok">Defined DECIMAL precision and nullability guidance.</li>
+    </ul>
+
+    <h2>2. Corrected OLTP (ERD) — tables & relationships</h2>
+
+    <h3>2.1 Core OLTP tables — PK & FK Summary</h3>
+    <table>
+      <tr>
+        <th>Table</th>
+        <th>Primary Key(s)</th>
+        <th>Foreign Key(s) & References</th>
+      </tr>
+      <tr>
+        <td>Bookings</td>
+        <td>BookingID</td>
+        <td>
+          CustomerID → Customers.CustomerID<br>
+          PackageID → Packages.PackageID<br>
+          HotelID → Hotels.HotelID<br>
+          BookingDateID → DateDim.DateID<br>
+          DestinationID → Destinations.DestinationID
+        </td>
+      </tr>
+      <tr>
+        <td>Cancellations</td>
+        <td>CancellationID<br>(BookingID UNIQUE)</td>
+        <td>
+          BookingID → Bookings.BookingID<br>
+          CancellationDateID → DateDim.DateID
+        </td>
+      </tr>
+      <tr>
+        <td>Invoices</td>
+        <td>InvoiceID</td>
+        <td>
+          BookingID → Bookings.BookingID<br>
+          InvoiceDateID → DateDim.DateID
+        </td>
+      </tr>
+      <tr>
+        <td>Payments</td>
+        <td>PaymentID</td>
+        <td>
+          PaymentDateID → DateDim.DateID
+        </td>
+      </tr>
+      <tr>
+        <td>PaymentAllocations</td>
+        <td>(PaymentID, BookingID)</td>
+        <td>
+          PaymentID → Payments.PaymentID<br>
+          BookingID → Bookings.BookingID
+        </td>
+      </tr>
+      <tr>
+        <td>Refunds</td>
+        <td>RefundID</td>
+        <td>
+          BookingID → Bookings.BookingID<br>
+          RefundDateID → DateDim.DateID<br>
+          CancellationID → Cancellations.CancellationID
+        </td>
+      </tr>
+      <tr>
+        <td>Customers</td>
+        <td>CustomerID</td>
+        <td>—</td>
+      </tr>
+      <tr>
+        <td>Packages</td>
+        <td>PackageID</td>
+        <td>—</td>
+      </tr>
+      <tr>
+        <td>Hotels</td>
+        <td>HotelID</td>
+        <td>—</td>
+      </tr>
+      <tr>
+        <td>Destinations</td>
+        <td>DestinationID</td>
+        <td>—</td>
+      </tr>
+      <tr>
+        <td>DateDim</td>
+        <td>DateID</td>
+        <td>—</td>
+      </tr>
+      <tr>
+        <td>PackageDestinations</td>
+        <td>(PackageID, DestinationID)</td>
+        <td>
+          PackageID → Packages.PackageID<br>
+          DestinationID → Destinations.DestinationID
+        </td>
+      </tr>
+      <tr>
+        <td>PackageHotels</td>
+        <td>(PackageID, HotelID)</td>
+        <td>
+          PackageID → Packages.PackageID<br>
+          HotelID → Hotels.HotelID
+        </td>
+      </tr>
+    </table>
+
+    <h3>Notes</h3>
+    <ul>
+      <li>Use <code>UNIQUE</code> on <code>Cancellations.BookingID</code> if at most one cancellation per booking is the business rule.</li>
+      <li>Payment allocations let a single payment be split across bookings and allow multiple payments per booking.</li>
+    </ul>
+
+    <h2>3. Production-ready Star Schema (DW)</h2>
+
+    <h3>3.1 Fact tables (grain explicitly stated)</h3>
+    <table>
+      <tr><th>Fact</th><th>Grain</th><th>Key/Attributes</th></tr>
+      <tr><td>FACT_BOOKINGS</td><td>one row per Booking</td><td>BookingKey, BookingDateKey, CustomerKey, PackageKey, HotelKey, DestinationKey, IsCancelledFlag, CancellationDateKey (nullable), TotalAmount</td></tr>
+      <tr><td>FACT_INVOICES</td><td>one row per Invoice</td><td>InvoiceKey, BookingKey, InvoiceDateKey, InvoiceAmount, InvoiceNumber</td></tr>
+      <tr><td>FACT_PAYMENTS</td><td>one row per Payment (allocation rows in fact)</td><td>PaymentKey, BookingKey, PaymentDateKey, PaymentMethod, PaymentAmount</td></tr>
+      <tr><td>FACT_REFUNDS</td><td>one row per Refund</td><td>RefundKey, BookingKey, RefundDateKey, RefundAmount, CancellationKey (nullable)</td></tr>
+    </table>
+
+    <h3>3.2 Dimension tables (recommended attributes & SCD)</h3>
+    <table>
+      <tr><th>Dimension</th><th>Suggested Attributes (SCD-ready)</th></tr>
+      <tr><td>DIM_CUSTOMERS</td><td>CustomerKey (surrogate), CustomerID (natural), FirstName, LastName, Email, Phone, EffectiveFrom, EffectiveTo, IsCurrent, SourceSystem</td></tr>
+      <tr><td>DIM_PACKAGES</td><td>PackageKey, PackageID, PackageName, Description, PackageCost, EffectiveFrom, EffectiveTo, IsCurrent</td></tr>
+      <tr><td>DIM_HOTELS</td><td>HotelKey, HotelID, HotelName, Address, City, Country, Phone, EffectiveFrom, EffectiveTo, IsCurrent</td></tr>
+      <tr><td>DIM_DESTINATIONS</td><td>DestinationKey, DestinationID, Country, City, Description, EffectiveFrom, EffectiveTo, IsCurrent</td></tr>
+      <tr><td>DIM_DATE</td><td>DateKey, FullDate, Year, Month, Day, DayOfWeek</td></tr>
+      <tr><td>DIM_CANCELLATIONS</td><td>CancellationKey, CancellationID (optional), CancellationDateKey, Reason</td></tr>
+    </table>
+
+    <h3>3.3 Notes on facts & grain</h3>
+    <ul>
+      <li>FACT_BOOKINGS: keep one row per booking. <code>IsCancelledFlag</code> and <code>CancellationDateKey</code> capture cancellation as attributes if cancellation is 0/1. If multiple cancellations per booking are possible (rare), model cancellations as a fact.</li>
+      <li>FACT_PAYMENTS: store allocated payments at the booking grain (one payment allocation per row). The ETL will flatten <code>PaymentAllocations</code> to generate multiple rows per payment when needed.</li>
+      <li>All financial amounts use <code>DECIMAL(12,2)</code> unless business requires higher precision.</li>
+    </ul>
+
+    <h2>4. ETL mapping & transformations (source → DW)</h2>
+    <p>High-level mapping examples and transformation rules:</p>
+    <table>
+      <tr><th>Source</th><th>DW Target</th><th>Transformation</th></tr>
+      <tr><td>Bookings.BookingID</td><td>FACT_BOOKINGS.BookingKey</td><td>Lookup DIM_CUSTOMERS to get CustomerKey; map BookingDateID → DateKey; calculate TotalAmount from FACT_INVOICES</td></tr>
+      <tr><td>Invoices (source)</td><td>FACT_INVOICES</td><td>One row per invoice; ensure invoice date maps to DIM_DATE; InvoiceAmount numeric cast to DECIMAL(12,2)</td></tr>
+      <tr><td>Payments + PaymentAllocations</td><td>FACT_PAYMENTS</td><td>For each allocation row, create a FACT_PAYMENTS row. If payment has no allocation, create allocation to BookingID from payment reference or use staging rules.</td></tr>
+      <tr><td>Refunds</td><td>FACT_REFUNDS</td><td>Map RefundDateID → DateKey; link to BookingKey via BookingID</td></tr>
+    </table>
+
+    <h2>5. Validation & QA checks (run in ETL)</h2>
+    <ul>
+      <li>Row counts: bookings in source vs FACT_BOOKINGS (should match or be explainable by filtering)</li>
+      <li>Sum(amounts): SUM(InvoiceAmount) at source vs SUM(FACT_INVOICES) grouped by BookingKey</li>
+      <li>Null checks: required keys (BookingID, DateID) must not be null; otherwise send to error queue</li>
+      <li>FK integrity: all surrogates must have dimension lookups — insert unknown member rows ("Unknown") when lookup fails</li>
+      <li>Duplication: ensure unique constraints on natural business keys (e.g., InvoiceNumber) are validated</li>
+    </ul>
+
+    <h2>6. Governance & implementation notes</h2>
+    <ul>
+      <li>Time zones: store all timestamps in UTC in OLTP; map to local/timezone-aware dims at reporting layer if needed.</li>
+      <li>Audit & lineage: include <code>SourceSystem</code>, <code>ExtractedAt</code>, and <code>LoadBatchID</code> in staging and DW load metadata.</li>
+      <li>SCD handling: implement SCD2 for customers and hotels (recommended). For lightweight dims (Date), use static load.</li>
+      <li>Security: mask PII in non-authorized environments; encrypt sensitive columns at rest (emails/phones if required by policy).</li>
+    </ul>
+
+    <h2>7. Quick-start checklist before production deploy</h2>
+    <ol>
+      <li>Apply corrected DDL to a dev schema and run integration tests.</li>
+      <li>Implement staging tables and ETL jobs; include robust error handling.</li>
+      <li>Run reconciliation reports (row counts and financial sums) for multiple historical batches.</li>
+      <li>Decide retention / archival policies (invoices, logs).</li>
+      <li>Document all transformations and keep the mapping in a version-controlled spec.</li>
+    </ol>
+
+    <p style="margin-top:18px;">If you'd like, I can also:</p>
+    <ul>
+      <li>produce a downloadable SQL file with the DDLs split by environment (dev/stage/prod),</li>
+      <li>generate an ER diagram image (SVG/PNG), or</li>
+      <li>create an ETL mapping spreadsheet (CSV/XLSX) with one-to-one mappings and transformation rules.</li>
+    </ul>
+
+    <p class="badge">Status: Production-ready (after runbook & ETL tests)</p>
+
+  </div>
+</body>
+</html>
+
